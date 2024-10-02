@@ -2,7 +2,7 @@ print("Importing necessary libraries...")
 import numpy as np
 import matplotlib.pyplot as plt
 from qutip import qeye, sigmax, sigmay, sigmaz, tensor, basis, sesolve, sigmam
-from scipy.fft import fft, fftfreq, fftshift, ifftshift
+from scipy.fft import fft, fftfreq, fftshift, ifftshift, ifft
 from tqdm import tqdm
 from scipy.interpolate import interp1d
 # import math
@@ -19,6 +19,7 @@ Delta_omega = 10e6   # Comb spacing (10 MHz)
 t_span = (0, 1e-6)   # Time span for the simulation (1 microsecond)
 dt = 1e-9            # Time step (1 ns)
 t_eval = np.arange(t_span[0], t_span[1], dt)
+f_c = 0              # Carrier frequency
 
 # Coupling strength between TLS
 J = 1e6  # Coupling strength (1 MHz)
@@ -65,7 +66,8 @@ def omega_shifted(t, args):
     #     shift_applied = shift_magnitudes[idx]
     # else:
     #     shift_applied = 0.0
-    shift_applied = shift_magnitudes[0] if t >= shift_times[0] else 0.0
+    # shift_applied = shift_magnitudes[0] if t >= shift_times[0] else 0.0
+    shift_applied = 0.0
     
     # tqdm.write(f"Shift applied: {t}")
     return omega_0 + shift_applied
@@ -91,58 +93,90 @@ def frequency_comb(t, args):
 
 # Load experimental time-domain signal
 print('Loading experimental time-domain signal...')
-# 1. Load the data
-comb_amplitudes_db = np.load('trace_matrix_baseline.npy')[0, :]
-comb_frequencies = np.load('freq_matrix.npy')[0, :]
+# # 1. Load the data
+# comb_amplitudes_db = np.load('trace_matrix_baseline.npy')[0, :]
+# comb_frequencies = np.load('freq_matrix.npy')[0, :]
 
-# Convert amplitudes from dB to linear scale
-comb_amplitudes_linear = 10 ** (comb_amplitudes_db / 20)
+# # Convert amplitudes from dB to linear scale
+# # comb_amplitudes_linear = 10 ** (comb_amplitudes_db / 20)
+# comb_amplitudes_linear = comb_amplitudes_db
 
-# 2. Data Preprocessing
+# # 2. Data Preprocessing
 
-# Remove any NaN or Inf values
-valid_indices = np.isfinite(comb_frequencies) & np.isfinite(comb_amplitudes_linear)
-comb_frequencies = comb_frequencies[valid_indices]
-comb_amplitudes_linear = comb_amplitudes_linear[valid_indices]
+# # Remove any NaN or Inf values
+# valid_indices = np.isfinite(comb_frequencies) & np.isfinite(comb_amplitudes_linear)
+# comb_frequencies = comb_frequencies[valid_indices]
+# comb_amplitudes_linear = comb_amplitudes_linear[valid_indices]
 
-# Sort the data by frequency
-sorted_indices = np.argsort(comb_frequencies)
-comb_frequencies = comb_frequencies[sorted_indices]
-comb_amplitudes_linear = comb_amplitudes_linear[sorted_indices]
+# # Sort the data by frequency
+# sorted_indices = np.argsort(comb_frequencies)
+# comb_frequencies = comb_frequencies[sorted_indices]
+# comb_amplitudes_linear = comb_amplitudes_linear[sorted_indices]
 
-# 3. Interpolate onto a uniform grid
-num_points = len(comb_frequencies)
-freq_uniform = np.linspace(comb_frequencies[0], comb_frequencies[-1], num_points)
+# # 3. Interpolate onto a uniform grid
+# num_points = len(comb_frequencies)
+# freq_uniform = np.linspace(comb_frequencies[0], comb_frequencies[-1], num_points)
 
-# Interpolate amplitudes onto the uniform grid
-amplitude_interp = interp1d(comb_frequencies, comb_amplitudes_linear, kind='cubic', fill_value="extrapolate")
-comb_amplitudes_uniform = amplitude_interp(freq_uniform)
+# # Interpolate amplitudes onto the uniform grid
+# amplitude_interp = interp1d(comb_frequencies, comb_amplitudes_linear, kind='cubic', fill_value="extrapolate")
+# comb_amplitudes_uniform = amplitude_interp(freq_uniform)
 
-# 4. Shift Frequencies to Baseband
-f_min = freq_uniform[0]
-f_max = freq_uniform[-1]
-F_span = f_max - f_min
-f_c = (f_max + f_min) / 2  # Carrier frequency
+# # 4. Shift Frequencies to Baseband
+# f_min = freq_uniform[0]
+# f_max = freq_uniform[-1]
+# F_span = f_max - f_min
+# f_c = (f_max + f_min) / 2  # Carrier frequency
 
-# Shift frequencies to baseband
-freq_baseband = freq_uniform - f_c
+# # Shift frequencies to baseband
+# freq_baseband = freq_uniform - f_c
 
-# Create the complex spectrum with zero phase
-spectrum = comb_amplitudes_uniform * np.exp(1j * 0)
+# # Create the complex spectrum with zero phase
+# spectrum = comb_amplitudes_uniform * np.exp(1j * 0)
 
-# Shift the spectrum to center it around zero frequency
-spectrum_shifted = fftshift(spectrum)
+# # Shift the spectrum to center it around zero frequency
+# spectrum_shifted = fftshift(spectrum)
 
-# 5. Perform IFFT on the shifted spectrum
-time_signal = np.fft.ifft(spectrum_shifted)
+# # 5. Perform IFFT on the shifted spectrum
+# time_signal = np.fft.ifft(spectrum_shifted)
 
-# Compute the corresponding time vector
-freq_spacing = freq_uniform[1] - freq_uniform[0]
-df = freq_spacing
-dt = 1 / (num_points * df)
-time_vector = np.arange(-num_points // 2, num_points // 2) * dt
+# # Compute the corresponding time vector
+# freq_spacing = freq_uniform[1] - freq_uniform[0]
+# df = freq_spacing
+# dt = 1 / (num_points * df)
+# time_vector = np.arange(0, num_points) * dt
 
-t_eval = time_vector
+# Load the frequency domain data from the .npy files
+# comb_amplitudes_dBm = np.load('trace_matrix_baseline.npy')[0, :]
+# comb_frequencies = np.load('freq_matrix.npy')[0, :]
+
+# # Convert amplitude from dBm to linear scale
+# comb_amplitudes_linear = 10 ** ((comb_amplitudes_dBm - 30) / 10)
+
+# # Assign random phase (since phase is likely unknown)
+# phase = np.random.uniform(0, 2 * np.pi, len(comb_frequencies))
+
+# # Construct the complex signal in the frequency domain
+# freq_domain_signal = comb_amplitudes_linear * np.exp(1j * phase)
+
+# # Perform inverse FFT to get the time-domain signal
+# time_domain_signal = ifft(freq_domain_signal)
+
+# # Calculate frequency resolution (delta_f)
+# delta_f = comb_frequencies[1] - comb_frequencies[0]
+
+# # Determine total time duration T (from Nyquist theorem)
+# T = 1 / delta_f  # Total time in seconds
+
+# # Number of points in the frequency domain (which equals number of points in the time domain)
+# num_freqs = len(comb_frequencies)
+
+# # Time resolution (delta_t)
+# delta_t = T / num_freqs  # Time step
+
+# # Create the time vector
+# time_vector = np.linspace(0, T, num_freqs)
+
+# t_eval = time_vector
 
 # time_signal = np.load('time_signal.npy')
 # comb_frequencies = np.load('comb_frequencies.npy')
@@ -157,7 +191,7 @@ t_eval = time_vector
 # F_span = freq_uniform[-1] - freq_uniform[0]
 
 # dt = (len_time - 1) / (len_time * F_span)
-# Determine the order of magnitude of dt
+# # Determine the order of magnitude of dt
 # exponent = int(math.floor(math.log10(abs(dt))))
 # mantissa = dt / (10 ** exponent)
 
@@ -171,23 +205,31 @@ t_eval = time_vector
 # t_span = (0, len_time*dt)   # Time span for the simulation (1 microsecond)
 # t_eval = np.arange(t_span[0], t_span[1], dt)
 
+# # Apply a Hanning window to smooth the time-domain signal and reduce high-frequency artifacts
+# window = np.hanning(len(time_domain_signal))
+# smoothed_time_domain_signal = np.real(time_domain_signal) * window
+
+# # Use smoothed signal for further calculations
+# signal_interpolator = smoothed_time_domain_signal
+
+
 # signal_interpolator = interp1d(t_eval, np.real(time_signal), kind='cubic', fill_value="extrapolate")
 # signal_interpolator = signal_interpolator(t_eval)
 # signal_interpolator = Cubic_Spline(t_eval, np.real(time_signal))
-signal_interpolator = time_signal
+# signal_interpolator = time_domain_signal#time_signal
 
 # Generate random frequency shifts
 print('Generating random frequency shifts...')
-num_shifts = 1  # Number of random shifts
+num_shifts = 3  # Number of random shifts
 max_shift = 1e6  # Maximum shift magnitude (1 MHz)
 shift_times = np.sort(np.random.choice(t_eval, num_shifts, replace=False))
 shift_magnitudes = np.random.uniform(-max_shift, max_shift, num_shifts)
 print('Done!')
 
-def experimental_frequency_comb(t, args):
-    Omega_R = args['Omega_R']
-    # time_signal = args['time_signal']
-    return Omega_R * signal_interpolator
+# def experimental_frequency_comb(t, args):
+#     Omega_R = args['Omega_R']
+#     # time_signal = args['time_signal']
+#     return Omega_R * signal_interpolator
 
 # # Compute the frequency comb over t_eval
 # print('Computing frequency comb values for plotting...')
@@ -202,23 +244,34 @@ def experimental_frequency_comb(t, args):
 # fft_comb = fft(signal_interpolator)
 # fft_freqs_comb = fftfreq(len(t_eval), dt)
 
+# # Now, perform FFT on the time-domain signal to reconstruct the frequency domain
+# reconstructed_freq_domain_signal = fft(smoothed_time_domain_signal)
+
+# # Compute the amplitude from the reconstructed frequency domain signal
+# reconstructed_amplitudes = np.abs(reconstructed_freq_domain_signal)
+
+# # Convert reconstructed amplitudes to dBm for comparison
+# reconstructed_amplitudes_dBm = 10 * np.log10(reconstructed_amplitudes) + 30
+
+# # Plot the time-domain signal
+# plt.figure(figsize=(10, 6))
+# plt.plot(t_eval, signal_interpolator)
+# plt.title('Time-Domain Signal')
+# plt.xlabel('Time (s)')
+# plt.ylabel('Amplitude')
+# plt.grid(True)
+# plt.show()
+
 # # Plot the frequency comb
 # plt.figure(figsize=(10, 6))
-# plt.plot(fft_freqs_comb / 1e9, fft_comb, label='Frequency Comb')
+# plt.plot(comb_frequencies, reconstructed_amplitudes_dBm, label='Frequency Comb')
+# plt.plot(comb_frequencies, comb_amplitudes_dBm, label='Original Frequency Domain', linestyle='--')
 # plt.xlabel('Frequency (GHz)')
 # plt.ylabel('Frequency Comb Amplitude')
 # plt.title('Frequency Comb vs Frequency')
 # plt.grid(True)
+# plt.legend()
 # plt.show()
-
-# Plot the time-domain signal
-plt.figure(figsize=(10, 6))
-plt.plot(t_eval, signal_interpolator)
-plt.title('Time-Domain Signal')
-plt.xlabel('Time (s)')
-plt.ylabel('Amplitude')
-plt.grid(True)
-plt.show()
 
 # Build the on-site Hamiltonian terms
 Hz_terms = []
@@ -232,7 +285,9 @@ for i in range(N):
 
     # On-site sigma_x term with frequency comb
     Hx_i = operator_at_site(sx, i, N)
-    Hx_terms.append([Hx_i, Omega_R * signal_interpolator])#frequency_comb])  # Ensure frequency_comb uses omega_shifted
+    Hx_terms.append([Hx_i, frequency_comb])  # Ensure frequency_comb uses omega_shifted
+    # Hx_terms.append([Hx_i, Omega_R * signal_interpolator])#frequency_comb])  # Ensure frequency_comb uses omega_shifted
+
 
 # Interaction terms
 H_int_terms = []
@@ -273,7 +328,8 @@ psi_0 = tensor([basis(2, 0) for _ in range(N)])
 # List of expectation operators (e.g., total magnetization along x)
 expect_ops = [sum([operator_at_site(sx, i, N) for i in range(N)]), 
               sum([operator_at_site(sm, i, N) for i in range(N)]), 
-              sum([operator_at_site(sm.dag(), i, N) for i in range(N)])]
+              sum([operator_at_site(sm.dag(), i, N) for i in range(N)]),
+              sum([operator_at_site(sz, i, N) for i in range(N)])]
 
 # Number of expectation values and shifts
 num_expectations = len(expect_ops)
@@ -313,14 +369,16 @@ for idx, (shift_times, shift_magnitudes) in tqdm(enumerate(zip(shift_times, shif
     expectation_sx_t = result.expect[0]  # Total magnetization along x
     expectation_sm_t = result.expect[1]  # Total magnetization along y
     expectation_sm_dag_t = result.expect[2]  # Total magnetization along y
+    expectation_sz_t = result.expect[3]  # Total magnetization along z
 
     # FFT of the expectation value
     tqdm.write("Computing FFT of the expectation value...")
     N_t = len(t_eval)
     T = dt
-    fft_sx = ifftshift(fft(expectation_sx_t))
-    fft_sm = ifftshift(fft(expectation_sm_t))
-    fft_sm_dag = ifftshift(fft(expectation_sm_dag_t))
+    fft_sx = fft(expectation_sx_t)
+    fft_sm = fft(expectation_sm_t)
+    fft_sm_dag = fft(expectation_sm_dag_t)
+    fft_sz = fft(expectation_sz_t)
     fft_freqs = fftfreq(N_t, T) + f_c  # Shift frequencies back to original range
     tqdm.write("FFT computed.")
 
@@ -328,6 +386,7 @@ for idx, (shift_times, shift_magnitudes) in tqdm(enumerate(zip(shift_times, shif
     absorption_intensity_sx = 2.0 / N_t * np.abs(fft_sx)
     absorption_intensity_sm = 2.0 / N_t * np.abs(fft_sm)
     absorption_intensity_sm_dag = 2.0 / N_t * np.abs(fft_sm_dag)
+    absorption_intensity_sz = 2.0 / N_t * np.abs(fft_sz)
 
     # Plotting
     axs[idx, 0].plot(fft_freqs, absorption_intensity_sx, label=f"Shift at {shift_times:.2e} s\nMagnitude {shift_magnitudes:.2e} Hz")
@@ -350,6 +409,13 @@ for idx, (shift_times, shift_magnitudes) in tqdm(enumerate(zip(shift_times, shif
     axs[idx, 2].set_title(f'Shift {idx + 1}: Total Sm Dag')
     axs[idx, 2].grid(True)
     axs[idx, 2].legend()
+
+    axs[idx, 3].plot(fft_freqs, absorption_intensity_sz, label=f"Shift at {shift_times:.2e} s\nMagnitude {shift_magnitudes:.2e} Hz")
+    axs[idx, 3].set_xlabel('Frequency (GHz)')
+    axs[idx, 3].set_ylabel('Absorption Intensity')
+    axs[idx, 3].set_title(f'Shift {idx + 1}: Total Sz')
+    axs[idx, 3].grid(True)
+    axs[idx, 3].legend()
 
 plt.tight_layout()
 plt.savefig('TLSCombNQubits.png')

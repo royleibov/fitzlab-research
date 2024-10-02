@@ -11,31 +11,32 @@ comb_frequencies = np.load('freq_matrix.npy')[0, :]
 comb_amplitudes_linear = 10 ** (comb_amplitudes_db / 20)
 
 plt.figure(figsize=(10, 6))
-plt.plot(comb_frequencies, comb_amplitudes_linear, linestyle='-')
-plt.title('Linear Amplitudes vs. Frequencies')
+plt.plot(comb_frequencies, comb_amplitudes_db, linestyle='-')
+plt.title('Amplitudes vs. Frequencies')
 plt.xlabel('Frequency (Hz)')
-plt.ylabel('Amplitude (Linear Scale)')
+plt.ylabel('Amplitude')
 plt.grid(True)
 plt.show()
 
 # 2. Data Preprocessing
 
 # Remove any NaN or Inf values
-valid_indices = np.isfinite(comb_frequencies) & np.isfinite(comb_amplitudes_linear)
+valid_indices = np.isfinite(comb_frequencies) & np.isfinite(comb_amplitudes_db)
 comb_frequencies = comb_frequencies[valid_indices]
-comb_amplitudes_linear = comb_amplitudes_linear[valid_indices]
+comb_amplitudes_db = comb_amplitudes_db[valid_indices]
 
 # Sort the data by frequency
 sorted_indices = np.argsort(comb_frequencies)
 comb_frequencies = comb_frequencies[sorted_indices]
-comb_amplitudes_linear = comb_amplitudes_linear[sorted_indices]
+comb_amplitudes_db = comb_amplitudes_db[sorted_indices]
 
 # 3. Interpolate onto a uniform grid
 num_points = len(comb_frequencies)
+print(f"Number of points: {num_points}")
 freq_uniform = np.linspace(comb_frequencies[0], comb_frequencies[-1], num_points)
 
 # Interpolate amplitudes onto the uniform grid
-amplitude_interp = interp1d(comb_frequencies, comb_amplitudes_linear, kind='cubic', fill_value="extrapolate")
+amplitude_interp = interp1d(comb_frequencies, comb_amplitudes_db, kind='cubic', fill_value="extrapolate")
 comb_amplitudes_uniform = amplitude_interp(freq_uniform)
 
 # 4. Shift Frequencies to Baseband
@@ -59,7 +60,9 @@ time_signal = np.fft.ifft(spectrum_shifted)
 # Compute the corresponding time vector
 freq_spacing = freq_uniform[1] - freq_uniform[0]
 df = freq_spacing
+print(f"df: {df}")
 dt = 1 / (num_points * df)
+print(f"dt: {dt}")
 time_vector = np.arange(-num_points // 2, num_points // 2) * dt
 
 # 6. Plot the Time-Domain Signal
