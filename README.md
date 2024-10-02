@@ -23,13 +23,13 @@ import numpy as np
 ```
 
 Next, you would want to build the Hamiltonian. You can build your own Hamiltonian, or you can use the predefined one:
-$$H = \sum_i \left{ \frac{\omega_{0}}{2} \vec{E} \cdot \vec{d} \sigma_z^{(i)} + f(t) \sigma_x^{(i)} \right} + \frac{J}{2} \left[ \left( \sum_i \sigma_x^{(i)} \right)^2 + \left( \sum_i \sigma_y^{(i)} \right)^2 + \left( \sum_i \sigma_z^{(i)} \right)^2 - 3 N I \right]$$
+$$H = \sum_i \left( \frac{\omega_{0}}{2} \vec{E} \cdot \vec{d} \sigma_z^{(i)} + f(t) \sigma_x^{(i)} \right) + \frac{J}{2} \left[ \left( \sum_i \sigma_x^{(i)} \right)^2 + \left( \sum_i \sigma_y^{(i)} \right)^2 + \left( \sum_i \sigma_z^{(i)} \right)^2 - 3 N I \right]$$
 
 Where $\omega_{0}$ is the TLS base frequency, $E$ is the planar electric field, $d$ is the TLS dipole moment, $f(t)$ is a possibly time dependent driving field perpendicular to TLS plane, and $J$ is TLS coupling strength. The second term in the Hamiltonian (involving $J$) is a all-to-all Ising model coupling.
 
 You would need to define an `args` dict before using the provided `Hamiltonian` class:
 ```python
-args_template = {
+args = {
     'N': 5,  # Number of TLSs
     'omega_0': 5e9,  # Base frequency of the TLS (Hz)
     'omega_R': 0.1e9,  # Rabi frequency (Hz)
