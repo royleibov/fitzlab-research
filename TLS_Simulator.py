@@ -45,71 +45,121 @@ class TLSSimulator:
         results = sesolve(self.H, self.psi0, self.tlist, self.e_ops, args=self.args)
         return results
     
-    def plot_results(self, results: list, fourier_transform: bool = False):
+    def plot_results(self, results: list, fourier_transform: bool = False, same_plot: bool = False, titles: list = None, x_label: str = 'Time', y_label: str = 'Expectation Value', labels: list = None):
         '''
         Plots the results of the simulation.
 
         Parameters:
             results (list): List of expectation values of the operators at each time.
             fourier_transform (bool): Whether to plot the Fourier transform of the results.
+            same_plot (bool): Whether to plot all results on the same plot.
+            titles (list): List of titles for each subplot.
+            x_label (str): Label for the x-axis.
+            y_label (str): Label for the y-axis.
+            labels (list): List of labels for the legend.
 
         Returns:
             None
         '''
 
         if fourier_transform:
-            self.plot_fourier_transform(results)
+            self.plot_fourier_transform(results, same_plot, titles, x_label, y_label, labels)
+        else:
+            if same_plot:
+                plt.figure(figsize=(10, 6))
+                for i in range(len(self.e_ops)):
+                    label = labels[i] if labels else f'Operator {i}'
+                    plt.plot(self.tlist, results.expect[i], linestyle='-', label=label)
+                plt.title(titles[0] if titles else 'Expectation Values of Operators vs. Time')
+                plt.xlabel(x_label)
+                plt.ylabel(y_label)
+                plt.legend()
+                plt.grid(True)
+                plt.tight_layout()
+                plt.show()
+            else:
+                fig, axs = plt.subplots(len(self.e_ops), 1, figsize=(10, 6 * len(self.e_ops)))
+
+                # Ensure axs is always iterable
+                if len(self.e_ops) == 1:
+                    axs = [axs]  # Wrap the single Axes object in a list
+
+                for i in range(len(self.e_ops)):
+                    label = labels[i] if labels else f'Operator {i}'
+                    axs[i].plot(self.tlist, results.expect[i], linestyle='-', label=label)
+                    axs[i].set_title(titles[i] if titles else f'Expectation Value of Operator {i} vs. Time')
+                    axs[i].set_xlabel(x_label)
+                    axs[i].set_ylabel(y_label)
+                    axs[i].legend()
+                    axs[i].grid(True)
+                plt.tight_layout()
+                plt.show()
+
+    def plot_fourier_transform(self, results: list, same_plot: bool = False, titles: list = None, x_label: str = 'Frequency (Hz)', y_label: str = 'Amplitude', labels: list = None):
+        '''
+        Plots the Fourier transform of the results of the simulation.
+
+        Parameters:
+            results (list): List of expectation values of the operators at each time.
+            same_plot (bool): Whether to plot all results on the same plot.
+            titles (list): List of titles for each subplot.
+            x_label (str): Label for the x-axis.
+            y_label (str): Label for the y-axis.
+            labels (list): List of labels for the legend.
+
+        Returns:
+            None
+        '''
+
+        if same_plot:
+            plt.figure(figsize=(10, 6))
+            # Calculate the Fourier transform of the results
+            time_vector = self.tlist
+            time_spacing = time_vector[1] - time_vector[0]
+            freq_vector = fftfreq(len(time_vector), time_spacing)
+            freq_vector = fftshift(freq_vector)
+
+            for i in range(len(self.e_ops)):
+                results_fft = fft(results.expect[i])
+                results_fft = fftshift(results_fft)
+                label = labels[i] if labels else f'Operator {i}'
+
+                # Plot the Fourier transform
+                plt.plot(freq_vector, np.abs(results_fft), linestyle='-', label=label)
+
+            plt.title(titles[0] if titles else 'Fourier Transform of Expectation Values of Operators')
+            plt.xlabel(x_label)
+            plt.ylabel(y_label)
+            plt.legend()
+            plt.grid(True)
+            plt.tight_layout()
+            plt.show()
         else:
             fig, axs = plt.subplots(len(self.e_ops), 1, figsize=(10, 6 * len(self.e_ops)))
 
             # Ensure axs is always iterable
             if len(self.e_ops) == 1:
                 axs = [axs]  # Wrap the single Axes object in a list
-
+            
             for i in range(len(self.e_ops)):
-                axs[i].plot(self.tlist, results.expect[i], linestyle='-', label=f'Operator {i}')
-                axs[i].set_title(f'Expectation Value of Operator {i} vs. Time')
-                axs[i].set_xlabel('Time')
-                axs[i].set_ylabel('Expectation Value')
+                # Calculate the Fourier transform of the results
+                time_vector = self.tlist
+                time_spacing = time_vector[1] - time_vector[0]
+                freq_vector = fftfreq(len(time_vector), time_spacing)
+                freq_vector = fftshift(freq_vector)
+                results_fft = fft(results.expect[i])
+                results_fft = fftshift(results_fft)
+                label = labels[i] if labels else f'Operator {i}'
+
+                # Plot the Fourier transform
+                axs[i].plot(freq_vector, np.abs(results_fft), linestyle='-', label=label)
+                axs[i].set_title(titles[i] if titles else f'Fourier Transform of Expectation Value of Operator {i}')
+                axs[i].set_xlabel(x_label)
+                axs[i].set_ylabel(y_label)
                 axs[i].legend()
                 axs[i].grid(True)
             plt.tight_layout()
             plt.show()
-
-    def plot_fourier_transform(self, results: list):
-        '''
-        Plots the Fourier transform of the results of the simulation.
-
-        Parameters:
-            results (list): List of expectation values of the operators at each time.
-
-        Returns:
-            None
-        '''
-
-        fig, axs = plt.subplots(len(self.e_ops), 1, figsize=(10, 6 * len(self.e_ops)))
-
-        # Ensure axs is always iterable
-        if len(self.e_ops) == 1:
-            axs = [axs]  # Wrap the single Axes object in a list
-        
-        for i in range(len(self.e_ops)):
-            # Calculate the Fourier transform of the results
-            time_vector = self.tlist
-            time_spacing = time_vector[1] - time_vector[0]
-            freq_vector = fftfreq(len(time_vector), time_spacing)
-            freq_vector = fftshift(freq_vector)
-            results_fft = fft(results.expect[i])
-            results_fft = fftshift(results_fft)
-
-            # Plot the Fourier transform
-            axs[i].plot(freq_vector, np.abs(results_fft), linestyle='-')
-            axs[i].set_title(f'Fourier Transform of Expectation Value of Operator {i}')
-            axs[i].set_xlabel('Frequency (Hz)')
-            axs[i].set_ylabel('Amplitude')
-            axs[i].grid(True)
-        plt.tight_layout()
-        plt.show()
 
 
 class Hamiltonian:
@@ -187,6 +237,20 @@ class Hamiltonian:
             H (Qobj): Hamiltonian of the system.
         '''
         return self.H
+    
+    def eigenstates(self):
+        '''
+        Returns the eigenvalues and eigenvectors of the Hamiltonian.
+
+        Parameters:
+            None
+
+        Returns:
+            eigenvalues (array): Eigenvalues of the Hamiltonian.
+            eigenvectors (array): Eigenvectors of the Hamiltonian.
+        '''
+        H = Qobj(self.H)
+        return H.eigenstates()
     
 
 def tensor_operator(op_list):
