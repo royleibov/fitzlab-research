@@ -1,16 +1,16 @@
-print("Importing necessary libraries...")
+# print("Importing necessary libraries...")
 import numpy as np
 import matplotlib.pyplot as plt
-from qutip import qeye, sigmax, sigmay, sigmaz, tensor, sesolve, sigmam, Qobj#, basis
+from qutip import qeye, sigmax, sigmay, sigmaz, tensor, sesolve, mesolve, sigmam, Qobj, coefficient#, basis
 from scipy.fft import fft, fftfreq, fftshift#, ifftshift, ifft
 # from tqdm import tqdm
 # from scipy.interpolate import interp1d
 from typing import Callable
 # import math
-print("Imported necessary libraries")
+# print("Imported necessary libraries")
 
 class TLSSimulator:
-    def __init__(self, H: Qobj, psi0: Qobj, tlist: np.array, e_ops: list, args: dict):
+    def __init__(self, H: Qobj, psi0: Qobj, tlist: np.array, e_ops: list, args: dict, c_ops: list = []):
         '''
         Simulates the time evolution of a TLS system.
 
@@ -30,6 +30,7 @@ class TLSSimulator:
         self.tlist = tlist
         self.e_ops = e_ops
         self.args = args
+        self.c_ops = c_ops
 
     def run(self):
         '''
@@ -41,8 +42,11 @@ class TLSSimulator:
         Returns:
             results (list): List of expectation values of the operators at each time.
         '''
+        if self.c_ops:
+            results = mesolve(self.H, self.psi0, self.tlist, self.c_ops, self.e_ops, args=self.args, options={'nsteps': 5000})
+        else:
+            results = sesolve(self.H, self.psi0, self.tlist, self.e_ops, args=self.args)
 
-        results = sesolve(self.H, self.psi0, self.tlist, self.e_ops, args=self.args)
         return results
     
     def plot_results(self, results: list, fourier_transform: bool = False, same_plot: bool = False, titles: list = None, x_label: str = 'Time', y_label: str = 'Expectation Value', labels: list = None):
@@ -199,7 +203,7 @@ class Hamiltonian:
         for i in range(N):
             # On-site sigma_z term
             Hz_i = operator_at_site(sz, i, N)
-            Hz_terms.append([Hz_i, lambda t, args: args['omega_0'] / 2 + args['dipole_moment'] * args['E_field']])
+            Hz_terms.append([Hz_i, lambda t, args: (args['omega_0'] / 2) + args['dipole_moment'] * args['E_field']])
 
             # On-site sigma_x term with driving frequency
             Hx_i = operator_at_site(sx, i, N)
@@ -251,6 +255,68 @@ class Hamiltonian:
         '''
         H = Qobj(self.H)
         return H.eigenstates()
+    
+class RandomizedHamiltonian(Hamiltonian):
+    def __init__(self, args: dict):
+        N = args['N']
+        driving_frequency = args['driving_frequency']
+        omega_0_list = args['omega_0_list']
+        J_matrix = args['J_matrix']
+        phi_list = args['phi_list']
+
+        I = qeye(2)
+        sx = sigmax()
+        sy = sigmay()
+        sz = sigmaz()
+        sm = sigmam()
+
+        # Precompute operators at each site to avoid redundant computations
+        sx_list = [operator_at_site(sx, i, N) for i in range(N)]
+        sy_list = [operator_at_site(sy, i, N) for i in range(N)]
+        sz_list = [operator_at_site(sz, i, N) for i in range(N)]
+        I_list  = [operator_at_site(I,  i, N) for i in range(N)]
+
+        # On-site Hamiltonian terms
+        Hz_terms = []
+        Hx_terms = []
+
+        for i in range(N):
+            # On-site sigma_z term with random omega_0
+            Hz_i = sz_list[i]
+            omega_0_i = omega_0_list[i]
+            phi_i = phi_list[i]
+            def Hz_i_func(t, args):
+                return args['omega_0_i'] / 2 + args['dipole_moment'] * args['E_field'] * np.cos(args['phi_i'])
+            Hz_i_coeff = coefficient(Hz_i_func, args={**args, 'omega_0_i': omega_0_i, 'phi_i': phi_i})
+            Hz_terms.append([Hz_i, Hz_i_coeff])
+
+            # On-site sigma_x term with driving frequency
+            Hx_i = sx_list[i]
+            Hx_terms.append([Hx_i, driving_frequency])
+
+        # Interaction terms
+        H_int_terms = []
+
+        if N > 1:
+            indices = np.triu_indices(N, k=1)
+
+            for i, j in zip(indices[0], indices[1]):
+                J_ij = J_matrix[i][j]
+
+                # Bind J_ij to the lambda function
+                def interaction_func(t, args):
+                    return args['J_ij'] / 2
+                interaction_coeff = coefficient(interaction_func, args={**args, 'J_ij': J_ij})
+                H_int_terms.extend([
+                    [sx_list[i] * sx_list[j], interaction_coeff],
+                    [sy_list[i] * sy_list[j], interaction_coeff],
+                    [sz_list[i] * sz_list[j], interaction_coeff]
+                ])
+
+        H_static = H_int_terms
+
+        # Time-dependent terms
+        self.H = H_static + Hz_terms + Hx_terms
     
 
 def tensor_operator(op_list):
